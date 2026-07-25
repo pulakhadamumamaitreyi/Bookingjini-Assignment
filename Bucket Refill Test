@@ -1,0 +1,91 @@
+it("should block after 100 requests", async () => {
+
+    for (let i = 0; i < 100; i++) {
+
+        await request(app)
+            .post("/check")
+            .send({
+                apiKey: "burst-user",
+                endpoint: "/products"
+            });
+
+    }
+
+    const response = await request(app)
+        .post("/check")
+        .send({
+            apiKey: "burst-user",
+            endpoint: "/products"
+        });
+
+    expect(response.status).toBe(429);
+
+});
+it("should reset bucket", async () => {
+
+    await request(app)
+        .post("/admin/reset/test-user");
+
+    const response = await request(app)
+        .post("/check")
+        .send({
+            apiKey: "test-user",
+            endpoint: "/users"
+        });
+
+    expect(response.status).toBe(200);
+
+});
+it("should handle concurrent requests", async () => {
+
+    const requests = [];
+
+    for (let i = 0; i < 1000; i++) {
+
+        requests.push(
+            request(app)
+                .post("/check")
+                .send({
+                    apiKey: "load-user",
+                    endpoint: "/load"
+                })
+        );
+
+    }
+
+    const responses = await Promise.all(requests);
+
+    const allowed = responses.filter(r => r.status === 200);
+
+    const denied = responses.filter(r => r.status === 429);
+
+    expect(allowed.length).toBeLessThanOrEqual(100);
+
+    expect(denied.length).toBeGreaterThan(0);
+
+});
+it("should refill tokens over time", async () => {
+
+    for (let i = 0; i < 100; i++) {
+
+        await request(app)
+            .post("/check")
+            .send({
+                apiKey: "refill-user",
+                endpoint: "/api"
+            });
+
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 30000));
+
+    const response = await request(app)
+        .post("/check")
+        .send({
+            apiKey: "refill-user",
+            endpoint: "/api"
+        });
+
+    expect(response.status).toBe(200);
+
+});
